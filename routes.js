@@ -103,4 +103,30 @@ router.post('/register', (req, res) => {
     });
 });
 
+// Ruta para obtener los dispositivos de un usuario
+router.get('/dispositivos/:id', (req, res) => {
+    const userId = req.params.id;
+
+    const query = `
+        SELECT d.ID_Dispositivo, d.Nombre AS NombreDispositivo, td.NombreTipo 
+        FROM Dispositivo d
+        JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
+        JOIN TipoDispositivo td ON d.ID_Tipo = td.ID_Tipo
+        WHERE r.ID_USER = ?
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error al consultar la base de datos:', err);
+            return res.status(500).send('Error al consultar la base de datos');
+        }
+
+        if (results.length === 0) {
+            return res.status(200).send('No tiene dispositivo');
+        }
+
+        res.status(200).send(results);
+    });
+});
+
+
 module.exports = router;
