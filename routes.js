@@ -18,7 +18,7 @@ router.post('/video', (req, res) => {
         return res.status(400).send('Faltan datos requeridos');
     }
 
-    console.log('Datos recibidos:', { mac_address, guardar_fotografia, ID_Dispositivo });
+   // console.log('Datos recibidos:', { mac_address, guardar_fotografia, ID_Dispositivo });
 
     const fecha = new Date().toISOString().split('T')[0];
     const hora = new Date().toISOString().split('T')[1].split('.')[0];
@@ -128,5 +128,30 @@ router.get('/dispositivos/:id', (req, res) => {
     });
 });
 
+// Ruta para obtener la información de un dispositivo por ID
+router.get('/recursocamara/:id', (req, res) => {
+    const dispositivoId = req.params.id;
+
+    const query = `
+        SELECT c.guardar_fotografia, c.fecha, c.hora, d.Nombre AS NombreDispositivo
+        FROM Camara c
+        JOIN Dispositivo d ON c.ID_Dispositivo = d.ID_Dispositivo
+        WHERE c.ID_Dispositivo = ?
+        ORDER BY c.fecha DESC, c.hora DESC
+        LIMIT 1
+    `;
+    db.query(query, [dispositivoId], (err, results) => {
+        if (err) {
+            console.error('Error al consultar la base de datos:', err);
+            return res.status(500).send('Error al consultar la base de datos');
+        }
+
+        if (results.length === 0) {
+            return res.status(200).send('No hay imagen');
+        }
+        console.log('Respuesta enviada:', results[0]);
+        res.status(200).send(results[0]);
+    });
+});
 
 module.exports = router;
