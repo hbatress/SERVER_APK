@@ -54,6 +54,8 @@ router.post('/video', (req, res) => {
 
 // Ruta para el inicio de sesión
 router.post('/login', (req, res) => {
+    console.log('Datos recibidos en la solicitud:', req.body); // Mostrar en consola lo que se envía
+
     const { correo, contrasena } = req.body;
 
     if (!correo || !contrasena) {
@@ -76,9 +78,10 @@ router.post('/login', (req, res) => {
             return res.status(400).send('Contraseña incorrecta');
         }
 
-        res.status(200).send('Usuario correcto');
+        res.status(200).send({ message: 'Usuario correcto', id: user.id });
     });
 });
+
 
 // Ruta para registrar un nuevo usuario
 router.post('/register', (req, res) => {
@@ -95,7 +98,8 @@ router.post('/register', (req, res) => {
             return res.status(500).send('Error al registrar el usuario');
         }
 
-        res.status(200).send('Usuario creado correctamente');
+        const userId = result.insertId;
+        res.status(200).send({ message: 'Usuario creado correctamente', id: userId });
     });
 });
 
