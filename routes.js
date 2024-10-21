@@ -88,20 +88,42 @@ router.post('/register', (req, res) => {
     const { correo, contrasena } = req.body;
 
     if (!correo || !contrasena) {
-        return res.status(400).send('Faltan datos requeridos');
+        const response = { message: 'Faltan datos requeridos' };
+        return res.status(400).json(response);
     }
 
-    const query = 'INSERT INTO Usuario (correo, contrasena) VALUES (?, ?)';
-    db.query(query, [correo, contrasena], (err, result) => {
+    // Verificar si el correo ya existe
+    const checkQuery = 'SELECT * FROM Usuario WHERE correo = ?';
+    db.query(checkQuery, [correo], (err, results) => {
         if (err) {
-            console.error('Error al registrar el usuario:', err);
-            return res.status(500).send('Error al registrar el usuario');
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            return res.status(500).json(response);
         }
 
-        const userId = result.insertId;
-        res.status(200).send({ message: 'Usuario creado correctamente', id: userId });
+        if (results.length > 0) {
+            const response = { message: 'El correo ya está registrado' };
+            console.log('Respuesta enviada:', response);
+            return res.status(400).json(response);
+        }
+
+        // Insertar el nuevo usuario
+        const insertQuery = 'INSERT INTO Usuario (correo, contrasena) VALUES (?, ?)';
+        db.query(insertQuery, [correo, contrasena], (err, result) => {
+            if (err) {
+                const response = { message: 'Error al registrar el usuario' };
+                console.error('Error al registrar el usuario:', err);
+                return res.status(500).json(response);
+            }
+
+            const userId = result.insertId;
+            const response = { message: 'Usuario creado correctamente', id: userId };
+            console.log('Respuesta enviada:', response);
+            res.status(200).json(response);
+        });
     });
 });
+
 
 // Ruta para obtener los dispositivos de un usuario
 router.get('/dispositivos/:id', (req, res) => {
@@ -309,5 +331,168 @@ router.get('/calidad-aire/:userId', (req, res) => {
         res.status(200).json(response);
     });
 });
+
+// Ruta para obtener el promedio de calidad de aire por hora, la fecha y la hora en base al ID del usuario
+router.get('/promedio-calidad-aire/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    const query = `
+        SELECT DATE(m.fecha) AS fecha, HOUR(m.hora) AS hora, AVG(m.indice_calidad_aire) AS promedio_calidad_aire
+        FROM MonitoreoDeAire m
+        JOIN Dispositivo d ON m.ID_Dispositivo = d.ID_Dispositivo
+        JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        GROUP BY DATE(m.fecha), HOUR(m.hora)
+        ORDER BY fecha DESC, hora DESC
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (results.length === 0) {
+            const response = { message: 'No se encontraron datos de calidad de aire para este usuario' };
+            console.log('Respuesta enviada:', response);
+            return res.status(200).json(response);
+        }
+
+        const response = results;
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+
+// Ruta para recibir el mac address, la temperatura y el ID del dispositivo
+router.post('/sensor-temperatura', (req, res) => {
+    const { mac_address, temperatura, ID_Dispositivo } = req.body;
+
+    console.log('Datos recibidos:', { mac_address, temperatura, ID_Dispositivo });
+
+    if (!mac_address || !temperatura || !ID_Dispositivo) {
+        const response = { message: 'Faltan datos requeridos' };
+        console.log('Respuesta enviada:', response);
+        return res.status(400).json(response);
+    }
+
+    const fecha = new Date().toISOString().split('T')[0];
+    const hora = new Date().toISOString().split('T')[1].split('.')[0];
+
+    // Insertar los datos en la tabla SensorDeTemperatura
+    const insertQuery = 'INSERT INTO SensorDeTemperatura (mac_address, temperatura, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
+    db.query(insertQuery, [mac_address, temperatura, fecha, hora, ID_Dispositivo], (err, result) => {
+        if (err) {
+            const response = { message: 'Error al insertar los datos en la base de datos' };
+            console.error('Error al insertar los datos en la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        const response = { message: 'Datos insertados correctamente' };
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+// Ruta para obtener el nombre del dispositivo, la temperatura, la fecha y la hora en base al ID del usuario
+router.get('/temperatura/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    const query = `
+        SELECT s.temperatura, s.fecha, s.hora, d.Nombre AS NombreDispositivo
+        FROM SensorDeTemperatura s
+        JOIN Dispositivo d ON s.ID_Dispositivo = d.ID_Dispositivo
+        JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        ORDER BY s.fecha DESC, s.hora DESC
+        LIMIT 1
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (results.length === 0) {
+            const response = { message: 'No se encontraron datos de temperatura para este usuario' };
+            console.log('Respuesta enviada:', response);
+            return res.status(200).json(response);
+        }
+
+        const response = results[0];
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+// Ruta para obtener el promedio de temperatura por hora, la fecha y la hora en base al ID del usuario
+router.get('/promedio-temperatura/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    const query = `
+        SELECT DATE(s.fecha) AS fecha, HOUR(s.hora) AS hora, AVG(s.temperatura) AS promedio_temperatura
+        FROM SensorDeTemperatura s
+        JOIN Dispositivo d ON s.ID_Dispositivo = d.ID_Dispositivo
+        JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        GROUP BY DATE(s.fecha), HOUR(s.hora)
+        ORDER BY fecha DESC, hora DESC
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (results.length === 0) {
+            const response = { message: 'No se encontraron datos de temperatura para este usuario' };
+            console.log('Respuesta enviada:', response);
+            return res.status(200).json(response);
+        }
+
+        const response = results;
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+
+// Ruta para eliminar un registro de la tabla recursos basado en el ID del dispositivo y el ID del usuario
+router.delete('/eliminar-recurso', (req, res) => {
+    const { ID_Dispositivo, ID_USER } = req.body;
+
+    console.log('Datos recibidos:', { ID_Dispositivo, ID_USER });
+
+    if (!ID_Dispositivo || !ID_USER) {
+        const response = { message: 'Faltan datos requeridos' };
+        console.log('Respuesta enviada:', response);
+        return res.status(400).json(response);
+    }
+
+    // Eliminar el registro de la tabla recursos
+    const deleteQuery = 'DELETE FROM recursos WHERE ID_Dispositivo = ? AND ID_USER = ?';
+    db.query(deleteQuery, [ID_Dispositivo, ID_USER], (err, result) => {
+        if (err) {
+            const response = { message: 'Error al eliminar el registro en la base de datos' };
+            console.error('Error al eliminar el registro en la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (result.affectedRows === 0) {
+            const response = { message: 'No se encontró el registro para eliminar' };
+            console.log('Respuesta enviada:', response);
+            return res.status(404).json(response);
+        }
+
+        const response = { message: 'Registro eliminado correctamente' };
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+
 
 module.exports = router;
