@@ -153,5 +153,97 @@ router.get('/recursocamara/:id', (req, res) => {
         res.status(200).send(results[0]);
     });
 });
+// Ruta para obtener la información del usuario y la cantidad de dispositivos que tiene
+router.get('/usuario/:id', (req, res) => {
+    const userId = req.params.id;
+
+    const query = `
+        SELECT u.correo, u.contrasena, COUNT(d.ID_Dispositivo) AS cantidad_dispositivos
+        FROM Usuario u
+        LEFT JOIN recursos r ON u.id = r.ID_USER
+        LEFT JOIN Dispositivo d ON r.ID_Dispositivo = d.ID_Dispositivo
+        WHERE u.id = ?
+        GROUP BY u.id
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            console.error('Error al consultar la base de datos:', err);
+            return res.status(500).send('Error al consultar la base de datos');
+        }
+
+        if (results.length === 0) {
+            return res.status(200).send('No se encontraron dispositivos para este usuario');
+        }
+
+        res.status(200).send(results[0]);
+    });
+});
+
+// Ruta para agregar un dispositivo a un usuario
+router.post('/agregar-dispositivo', (req, res) => {
+    const { userId, nombreDispositivo, contrasenaDispositivo } = req.body;
+
+    if (!userId || !nombreDispositivo || !contrasenaDispositivo) {
+        const response = { message: 'Faltan datos requeridos' };
+        console.log('Respuesta enviada:', response);
+        return res.status(400).json(response);
+    }
+
+    // Verificar si el dispositivo ya está registrado en recursos para el usuario
+    const checkQuery = `
+        SELECT * FROM recursos r
+        JOIN Dispositivo d ON r.ID_Dispositivo = d.ID_Dispositivo
+        WHERE r.ID_USER = ? AND d.Nombre = ?
+    `;
+    db.query(checkQuery, [userId, nombreDispositivo], (err, results) => {
+        if (err) {
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (results.length > 0) {
+            const response = { message: 'El dispositivo ya está registrado para este usuario' };
+            console.log('Respuesta enviada:', response);
+            return res.status(400).json(response);
+        }
+
+        // Verificar si el nombre y la contraseña del dispositivo coinciden
+        const verifyQuery = 'SELECT * FROM Dispositivo WHERE Nombre = ? AND Contrasena = ?';
+        db.query(verifyQuery, [nombreDispositivo, contrasenaDispositivo], (err, results) => {
+            if (err) {
+                const response = { message: 'Error al consultar la base de datos' };
+                console.error('Error al consultar la base de datos:', err);
+                console.log('Respuesta enviada:', response);
+                return res.status(500).json(response);
+            }
+
+            if (results.length === 0) {
+                const response = { message: 'Nombre o contraseña del dispositivo incorrectos' };
+                console.log('Respuesta enviada:', response);
+                return res.status(400).json(response);
+            }
+
+            const dispositivoId = results[0].ID_Dispositivo;
+
+            // Agregar el dispositivo a la tabla recursos
+            const insertQuery = 'INSERT INTO recursos (ID_Dispositivo, ID_USER) VALUES (?, ?)';
+            db.query(insertQuery, [dispositivoId, userId], (err, result) => {
+                if (err) {
+                    const response = { message: 'Error al insertar los datos en la base de datos' };
+                    console.error('Error al insertar los datos en la base de datos:', err);
+                    console.log('Respuesta enviada:', response);
+                    return res.status(500).json(response);
+                }
+
+                const response = { message: 'Dispositivo agregado correctamente' };
+                console.log('Respuesta enviada:', response);
+                res.status(200).json(response);
+            });
+        });
+    });
+});
+
 
 module.exports = router;
