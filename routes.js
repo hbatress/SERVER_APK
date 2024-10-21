@@ -246,4 +246,68 @@ router.post('/agregar-dispositivo', (req, res) => {
 });
 
 
+// Ruta para recibir el mac address, el índice de calidad de aire y el ID del dispositivo
+router.post('/monitoreo-aire', (req, res) => {
+    const { mac_address, indice_calidad_aire, ID_Dispositivo } = req.body;
+
+    console.log('Datos recibidos:', { mac_address, indice_calidad_aire, ID_Dispositivo });
+
+    if (!mac_address || !indice_calidad_aire || !ID_Dispositivo) {
+        const response = { message: 'Faltan datos requeridos' };
+        console.log('Respuesta enviada:', response);
+        return res.status(400).json(response);
+    }
+
+    const fecha = new Date().toISOString().split('T')[0];
+    const hora = new Date().toISOString().split('T')[1].split('.')[0];
+
+    // Insertar los datos en la tabla MonitoreoDeAire
+    const insertQuery = 'INSERT INTO MonitoreoDeAire (mac_address, indice_calidad_aire, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
+    db.query(insertQuery, [mac_address, indice_calidad_aire, fecha, hora, ID_Dispositivo], (err, result) => {
+        if (err) {
+            const response = { message: 'Error al insertar los datos en la base de datos' };
+            console.error('Error al insertar los datos en la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        const response = { message: 'Datos insertados correctamente' };
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+
+// Ruta para obtener el índice de calidad de aire, fecha, hora y nombre del dispositivo en base al ID del usuario
+router.get('/calidad-aire/:userId', (req, res) => {
+    const userId = req.params.userId;
+
+    const query = `
+        SELECT m.indice_calidad_aire, m.fecha, m.hora, d.Nombre AS NombreDispositivo
+        FROM MonitoreoDeAire m
+        JOIN Dispositivo d ON m.ID_Dispositivo = d.ID_Dispositivo
+        JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        ORDER BY m.fecha DESC, m.hora DESC
+        LIMIT 1
+    `;
+    db.query(query, [userId], (err, results) => {
+        if (err) {
+            const response = { message: 'Error al consultar la base de datos' };
+            console.error('Error al consultar la base de datos:', err);
+            console.log('Respuesta enviada:', response);
+            return res.status(500).json(response);
+        }
+
+        if (results.length === 0) {
+            const response = { message: 'No se encontraron datos de calidad de aire para este usuario' };
+            console.log('Respuesta enviada:', response);
+            return res.status(200).json(response);
+        }
+
+        const response = results[0];
+        console.log('Respuesta enviada:', response);
+        res.status(200).json(response);
+    });
+});
+
 module.exports = router;
