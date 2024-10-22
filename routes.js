@@ -163,7 +163,7 @@ router.get('/recursocamara/:id', (req, res) => {
     const dispositivoId = req.params.id;
 
     const query = `
-        SELECT c.guardar_fotografia, c.fecha, c.hora, d.Nombre AS NombreDispositivo
+        SELECT c.ID_Dispositivo, c.guardar_fotografia, c.fecha, c.hora, d.Nombre AS NombreDispositivo
         FROM Camara c
         JOIN Dispositivo d ON c.ID_Dispositivo = d.ID_Dispositivo
         WHERE c.ID_Dispositivo = ?
