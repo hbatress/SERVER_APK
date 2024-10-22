@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./database'); // Importar la lógica de la base de datos
-
+const moment = require('moment-timezone'); // Importar moment-timezone para manejar zonas horarias
 // Definir rutas
 router.get('/', (req, res) => {
     res.send('Bienvenido a la API');
@@ -18,10 +18,8 @@ router.post('/video', (req, res) => {
         return res.status(400).send('Faltan datos requeridos');
     }
 
-   // console.log('Datos recibidos:', { mac_address, guardar_fotografia, ID_Dispositivo });
-
-    const fecha = new Date().toISOString().split('T')[0];
-    const hora = new Date().toISOString().split('T')[1].split('.')[0];
+    const fecha = moment().tz('America/Guatemala').format('YYYY-MM-DD');
+    const hora = moment().tz('America/Guatemala').format('HH:mm:ss');
 
     // Insertar la nueva imagen
     const insertQuery = 'INSERT INTO Camara (mac_address, guardar_fotografia, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
@@ -51,6 +49,7 @@ router.post('/video', (req, res) => {
         }, 5000); // Esperar 5 segundos
     });
 });
+
 
 // Ruta para el inicio de sesión
 router.post('/login', (req, res) => {
@@ -175,6 +174,7 @@ router.get('/recursocamara/:id', (req, res) => {
         res.status(200).send(results[0]);
     });
 });
+
 // Ruta para obtener la información del usuario y la cantidad de dispositivos que tiene
 router.get('/usuario/:id', (req, res) => {
     const userId = req.params.id;
@@ -280,8 +280,8 @@ router.post('/monitoreo-aire', (req, res) => {
         return res.status(400).json(response);
     }
 
-    const fecha = new Date().toISOString().split('T')[0];
-    const hora = new Date().toISOString().split('T')[1].split('.')[0];
+    const fecha = moment().tz('America/Guatemala').format('YYYY-MM-DD');
+    const hora = moment().tz('America/Guatemala').format('HH:mm:ss');
 
     // Insertar los datos en la tabla MonitoreoDeAire
     const insertQuery = 'INSERT INTO MonitoreoDeAire (mac_address, indice_calidad_aire, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
@@ -298,6 +298,7 @@ router.post('/monitoreo-aire', (req, res) => {
         res.status(200).json(response);
     });
 });
+
 
 // Ruta para obtener el índice de calidad de aire, fecha, hora y nombre del dispositivo en base al ID del usuario
 router.get('/calidad-aire/:userId', (req, res) => {
@@ -335,17 +336,18 @@ router.get('/calidad-aire/:userId', (req, res) => {
 // Ruta para obtener el promedio de calidad de aire por hora, la fecha y la hora en base al ID del usuario
 router.get('/promedio-calidad-aire/:userId', (req, res) => {
     const userId = req.params.userId;
+    const today = moment().tz('America/Guatemala').format('YYYY-MM-DD'); // Obtener la fecha actual en la zona horaria de Guatemala
 
     const query = `
         SELECT DATE(m.fecha) AS fecha, HOUR(m.hora) AS hora, AVG(m.indice_calidad_aire) AS promedio_calidad_aire
         FROM MonitoreoDeAire m
         JOIN Dispositivo d ON m.ID_Dispositivo = d.ID_Dispositivo
         JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
-        WHERE r.ID_USER = ?
+        WHERE r.ID_USER = ? AND DATE(m.fecha) = ?
         GROUP BY DATE(m.fecha), HOUR(m.hora)
         ORDER BY fecha DESC, hora DESC
     `;
-    db.query(query, [userId], (err, results) => {
+    db.query(query, [userId, today], (err, results) => {
         if (err) {
             const response = { message: 'Error al consultar la base de datos' };
             console.error('Error al consultar la base de datos:', err);
@@ -365,6 +367,7 @@ router.get('/promedio-calidad-aire/:userId', (req, res) => {
     });
 });
 
+
 // Ruta para recibir el mac address, la temperatura y el ID del dispositivo
 router.post('/sensor-temperatura', (req, res) => {
     const { mac_address, temperatura, ID_Dispositivo } = req.body;
@@ -377,8 +380,8 @@ router.post('/sensor-temperatura', (req, res) => {
         return res.status(400).json(response);
     }
 
-    const fecha = new Date().toISOString().split('T')[0];
-    const hora = new Date().toISOString().split('T')[1].split('.')[0];
+    const fecha = moment().tz('America/Guatemala').format('YYYY-MM-DD');
+    const hora = moment().tz('America/Guatemala').format('HH:mm:ss');
 
     // Insertar los datos en la tabla SensorDeTemperatura
     const insertQuery = 'INSERT INTO SensorDeTemperatura (mac_address, temperatura, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
@@ -395,6 +398,8 @@ router.post('/sensor-temperatura', (req, res) => {
         res.status(200).json(response);
     });
 });
+
+
 // Ruta para obtener el nombre del dispositivo, la temperatura, la fecha y la hora en base al ID del usuario
 router.get('/temperatura/:userId', (req, res) => {
     const userId = req.params.userId;
@@ -427,20 +432,23 @@ router.get('/temperatura/:userId', (req, res) => {
         res.status(200).json(response);
     });
 });
+
+
 // Ruta para obtener el promedio de temperatura por hora, la fecha y la hora en base al ID del usuario
 router.get('/promedio-temperatura/:userId', (req, res) => {
     const userId = req.params.userId;
+    const today = moment().tz('America/Guatemala').format('YYYY-MM-DD'); // Obtener la fecha actual en la zona horaria de Guatemala
 
     const query = `
         SELECT DATE(s.fecha) AS fecha, HOUR(s.hora) AS hora, AVG(s.temperatura) AS promedio_temperatura
         FROM SensorDeTemperatura s
         JOIN Dispositivo d ON s.ID_Dispositivo = d.ID_Dispositivo
         JOIN recursos r ON d.ID_Dispositivo = r.ID_Dispositivo
-        WHERE r.ID_USER = ?
+        WHERE r.ID_USER = ? AND DATE(s.fecha) = ?
         GROUP BY DATE(s.fecha), HOUR(s.hora)
         ORDER BY fecha DESC, hora DESC
     `;
-    db.query(query, [userId], (err, results) => {
+    db.query(query, [userId, today], (err, results) => {
         if (err) {
             const response = { message: 'Error al consultar la base de datos' };
             console.error('Error al consultar la base de datos:', err);
