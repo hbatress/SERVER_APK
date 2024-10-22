@@ -477,7 +477,6 @@ router.get('/promedio-temperatura/:userId', (req, res) => {
     });
 });
 
-// Ruta para eliminar un registro de la tabla recursos basado en el ID del dispositivo y el ID del usuario
 router.delete('/eliminar-recurso', (req, res) => {
     const { ID_Dispositivo, ID_USER } = req.body;
 
@@ -509,7 +508,7 @@ router.delete('/eliminar-recurso', (req, res) => {
         console.log('Respuesta enviada:', response);
         res.status(200).json(response);
     });
-});  
+});
 
 
 module.exports = router;
