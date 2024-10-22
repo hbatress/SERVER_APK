@@ -31,25 +31,34 @@ router.post('/video', (req, res) => {
         console.log('Datos insertados correctamente:', { mac_address, guardar_fotografia, fecha, hora, ID_Dispositivo });
         res.status(200).send('Datos insertados correctamente');
 
-        // Esperar 5 segundos antes de eliminar las imágenes antiguas
-        setTimeout(() => {
-            // Eliminar imágenes que tienen más de 5 segundos de antigüedad para el mismo dispositivo
-            const deleteQuery = `
-                DELETE FROM Camara 
-                WHERE ID_Dispositivo = ? 
-                AND TIMESTAMPDIFF(SECOND, CONCAT(fecha, ' ', hora), NOW()) > 5
-            `;
-            db.query(deleteQuery, [ID_Dispositivo], (err, result) => {
-                if (err) {
-                    console.error('Error al eliminar las imágenes antiguas:', err);
-                    return;
-                }
-                console.log('Imágenes antiguas eliminadas:', result.affectedRows);
-            });
-        }, 5000); // Esperar 5 segundos
+        // Verificar si el número de imágenes excede las 20
+        const countQuery = 'SELECT COUNT(*) AS count FROM Camara WHERE ID_Dispositivo = ?';
+        db.query(countQuery, [ID_Dispositivo], (err, countResult) => {
+            if (err) {
+                console.error('Error al contar las imágenes:', err);
+                return;
+            }
+
+            const imageCount = countResult[0].count;
+            if (imageCount > 20) {
+                // Eliminar las imágenes más antiguas para mantener solo las 20 más recientes
+                const deleteQuery = `
+                    DELETE FROM Camara 
+                    WHERE ID_Dispositivo = ? 
+                    ORDER BY CONCAT(fecha, ' ', hora) ASC 
+                    LIMIT ?
+                `;
+                db.query(deleteQuery, [ID_Dispositivo, imageCount - 20], (err, deleteResult) => {
+                    if (err) {
+                        console.error('Error al eliminar las imágenes antiguas:', err);
+                        return;
+                    }
+                    console.log('Imágenes antiguas eliminadas:', deleteResult.affectedRows);
+                });
+            }
+        });
     });
 });
-
 
 // Ruta para el inicio de sesión
 router.post('/login', (req, res) => {
