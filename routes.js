@@ -492,7 +492,7 @@ router.delete('/eliminar-recurso', (req, res) => {
         console.log('Respuesta enviada:', response);
         res.status(200).json(response);
     });
-});
+});  
 
 
 module.exports = router;
