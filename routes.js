@@ -7,6 +7,11 @@ router.get('/', (req, res) => {
     res.send('Bienvenido a la API');
 });
 
+
+// Estructura en memoria para almacenar las imágenes temporalmente
+const imageStore = {};
+const MAX_IMAGES = 20; // Limitar el número de imágenes almacenadas en memoria
+
 // Ruta para recibir la imagen en formato base64, la MAC address y el ID del dispositivo
 router.post('/video', (req, res) => {
     console.log('Solicitud POST a /camara recibida');
@@ -21,42 +26,59 @@ router.post('/video', (req, res) => {
     const fecha = moment().tz('America/Guatemala').format('YYYY-MM-DD');
     const hora = moment().tz('America/Guatemala').format('HH:mm:ss');
 
-    // Insertar la nueva imagen
-    const insertQuery = 'INSERT INTO Camara (mac_address, guardar_fotografia, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?, ?)';
-    db.query(insertQuery, [mac_address, guardar_fotografia, fecha, hora, ID_Dispositivo], (err, result) => {
+    // Almacenar la imagen en memoria
+    if (!imageStore[ID_Dispositivo]) {
+        imageStore[ID_Dispositivo] = [];
+    }
+    imageStore[ID_Dispositivo].push({ guardar_fotografia, fecha, hora });
+
+    // Limitar el número de imágenes almacenadas en memoria
+    if (imageStore[ID_Dispositivo].length > MAX_IMAGES) {
+        imageStore[ID_Dispositivo].shift(); // Eliminar la imagen más antigua
+    }
+
+    // Insertar los datos sin la imagen en la base de datos
+    const insertQuery = 'INSERT INTO Camara (mac_address, fecha, hora, ID_Dispositivo) VALUES (?, ?, ?, ?)';
+    db.query(insertQuery, [mac_address, fecha, hora, ID_Dispositivo], (err, result) => {
         if (err) {
             console.error('Error al insertar los datos en la base de datos:', err);
             return res.status(500).send('Error al insertar los datos en la base de datos');
         }
-        console.log('Datos insertados correctamente:', { mac_address, guardar_fotografia, fecha, hora, ID_Dispositivo });
-        res.status(200).send('Datos insertados correctamente');
+        console.log('Datos insertados correctamente:', { mac_address, fecha, hora, ID_Dispositivo });
+        res.status(200).send('Imagen recibida y almacenada temporalmente');
+    });
+});
 
-        // Verificar si el número de imágenes excede las 20
-        const countQuery = 'SELECT COUNT(*) AS count FROM Camara WHERE ID_Dispositivo = ?';
-        db.query(countQuery, [ID_Dispositivo], (err, countResult) => {
-            if (err) {
-                console.error('Error al contar las imágenes:', err);
-                return;
-            }
+// Ruta para visualizar la imagen recibida
+router.post('/ver-imagen', (req, res) => {
+    const { userId: ID_Usuario, deviceId: ID_Dispositivo } = req.body;
 
-            const imageCount = countResult[0].count;
-            if (imageCount > 20) {
-                // Eliminar las imágenes más antiguas para mantener solo las 20 más recientes
-                const deleteQuery = `
-                    DELETE FROM Camara 
-                    WHERE ID_Dispositivo = ? 
-                    ORDER BY CONCAT(fecha, ' ', hora) ASC 
-                    LIMIT ?
-                `;
-                db.query(deleteQuery, [ID_Dispositivo, imageCount - 20], (err, deleteResult) => {
-                    if (err) {
-                        console.error('Error al eliminar las imágenes antiguas:', err);
-                        return;
-                    }
-                    console.log('Imágenes antiguas eliminadas:', deleteResult.affectedRows);
-                });
-            }
-        });
+    if (!ID_Usuario || !ID_Dispositivo) {
+        console.error('Faltan datos requeridos');
+        return res.status(400).send('Faltan datos requeridos');
+    }
+
+    // Verificar si el usuario está autorizado para ver la imagen
+    const authQuery = 'SELECT * FROM Usuarios WHERE ID_Usuario = ? AND ID_Dispositivo = ?';
+    db.query(authQuery, [ID_Usuario, ID_Dispositivo], (err, authResult) => {
+        if (err) {
+            console.error('Error al verificar la autorización del usuario:', err);
+            return res.status(500).send('Error al verificar la autorización del usuario');
+        }
+
+        if (authResult.length === 0) {
+            console.error('Usuario no autorizado');
+            return res.status(403).send('Usuario no autorizado');
+        }
+
+        // Devolver la imagen en formato base64 desde la memoria
+        const imageData = imageStore[ID_Dispositivo];
+        if (!imageData || imageData.length === 0) {
+            console.error('No se encontró ninguna imagen');
+            return res.status(404).send('No se encontró ninguna imagen');
+        }
+
+        res.status(200).send({ image: imageData[imageData.length - 1].guardar_fotografia });
     });
 });
 
