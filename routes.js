@@ -59,7 +59,13 @@ router.post('/ver-imagen', (req, res) => {
     }
 
     // Verificar si el usuario está autorizado para ver la imagen
-    const authQuery = 'SELECT * FROM Usuarios WHERE ID_Usuario = ? AND ID_Dispositivo = ?';
+    const authQuery = `
+        SELECT * 
+        FROM Usuario u
+        JOIN recursos r ON u.id = r.ID_USER
+        JOIN Dispositivo d ON r.ID_Dispositivo = d.ID_Dispositivo
+        WHERE u.id = ? AND d.ID_Dispositivo = ?
+    `;
     db.query(authQuery, [ID_Usuario, ID_Dispositivo], (err, authResult) => {
         if (err) {
             console.error('Error al verificar la autorización del usuario:', err);
