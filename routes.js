@@ -11,6 +11,7 @@ router.get('/', (req, res) => {
 // Estructura en memoria para almacenar las imágenes temporalmente
 const imageStore = {};
 const MAX_IMAGES = 20; // Limitar el número de imágenes almacenadas en memoria
+const IMAGE_EXPIRATION_TIME = 5 * 60 * 1000; // 5 minutos en milisegundos
 
 // Ruta para recibir la imagen en formato base64, la MAC address y el ID del dispositivo
 router.post('/video', (req, res) => {
@@ -28,13 +29,14 @@ router.post('/video', (req, res) => {
 
     // Almacenar la imagen en memoria
     if (!imageStore[ID_Dispositivo]) {
-        imageStore[ID_Dispositivo] = [];
+        imageStore[ID_Dispositivo] = { images: [], lastReceived: Date.now() };
     }
-    imageStore[ID_Dispositivo].push({ guardar_fotografia, fecha, hora });
+    imageStore[ID_Dispositivo].images.push({ guardar_fotografia, fecha, hora });
+    imageStore[ID_Dispositivo].lastReceived = Date.now();
 
     // Limitar el número de imágenes almacenadas en memoria
-    if (imageStore[ID_Dispositivo].length > MAX_IMAGES) {
-        imageStore[ID_Dispositivo].shift(); // Eliminar la imagen más antigua
+    if (imageStore[ID_Dispositivo].images.length > MAX_IMAGES) {
+        imageStore[ID_Dispositivo].images.shift(); // Eliminar la imagen más antigua
     }
 
     // Insertar los datos sin la imagen en la base de datos
@@ -79,14 +81,35 @@ router.post('/ver-imagen', (req, res) => {
 
         // Devolver la imagen en formato base64 desde la memoria
         const imageData = imageStore[ID_Dispositivo];
-        if (!imageData || imageData.length === 0) {
+        if (!imageData || imageData.images.length === 0) {
             console.error('No se encontró ninguna imagen');
             return res.status(404).send('No se encontró ninguna imagen');
         }
 
-        res.status(200).send({ image: imageData[imageData.length - 1].guardar_fotografia });
+        res.status(200).send({ image: imageData.images[imageData.images.length - 1].guardar_fotografia });
     });
 });
+
+// Ruta para verificar el estado de la cámara
+router.get('/estado-camara/:deviceId', (req, res) => {
+    const { deviceId: ID_Dispositivo } = req.params;
+
+    const imageData = imageStore[ID_Dispositivo];
+    if (!imageData) {
+        return res.status(404).send('No se encontró ninguna imagen para este dispositivo');
+    }
+
+    const currentTime = Date.now();
+    const timeDifference = currentTime - imageData.lastReceived;
+
+    if (timeDifference > IMAGE_EXPIRATION_TIME) {
+        return res.status(200).send({ estado: 'apagada' });
+    } else {
+        return res.status(200).send({ estado: 'encendida' });
+    }
+});
+
+
 
 // Ruta para el inicio de sesión
 router.post('/login', (req, res) => {
