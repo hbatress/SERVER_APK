@@ -562,4 +562,59 @@ router.delete('/eliminar-recurso', (req, res) => {
 });
 
 
+// Ruta para obtener solo la temperatura más reciente de un dispositivo específico basado en el ID del usuario
+router.get('/ver-temperatura/:userId', (req, res) => {
+    const { userId: ID_Usuario } = req.params;
+
+    const query = `
+        SELECT st.temperatura 
+        FROM SensorDeTemperatura st
+        JOIN recursos r ON st.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        ORDER BY CONCAT(st.fecha, ' ', st.hora) DESC 
+        LIMIT 1
+    `;
+    db.query(query, [ID_Usuario], (err, result) => {
+        if (err) {
+            console.error('Error al obtener la temperatura:', err);
+            return res.status(500).send('Error al obtener la temperatura');
+        }
+
+        if (result.length === 0) {
+            return res.status(404).send('No se encontró ninguna temperatura para este usuario');
+        }
+
+        res.status(200).send({ temperatura: result[0].temperatura });
+    });
+});
+
+// Ruta para obtener solo la calidad del aire más reciente de un dispositivo específico basado en el ID del usuario
+router.get('/ver-calidad-aire/:userId', (req, res) => {
+    const { userId: ID_Usuario } = req.params;
+
+    const query = `
+        SELECT ma.indice_calidad_aire 
+        FROM MonitoreoDeAire ma
+        JOIN recursos r ON ma.ID_Dispositivo = r.ID_Dispositivo
+        WHERE r.ID_USER = ?
+        ORDER BY CONCAT(ma.fecha, ' ', ma.hora) DESC 
+        LIMIT 1
+    `;
+    db.query(query, [ID_Usuario], (err, result) => {
+        if (err) {
+            console.error('Error al obtener la calidad del aire:', err);
+            return res.status(500).send('Error al obtener la calidad del aire');
+        }
+
+        if (result.length === 0) {
+            return res.status(404).send('No se encontró ninguna calidad del aire para este usuario');
+        }
+
+        res.status(200).send({ indice_calidad_aire: result[0].indice_calidad_aire });
+    });
+});
+
+
+
+
 module.exports = router;
