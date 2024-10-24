@@ -562,7 +562,7 @@ router.delete('/eliminar-recurso', (req, res) => {
 });
 
 
-// Ruta para obtener solo la temperatura más reciente de un dispositivo específico basado en el ID del usuario
+/// Ruta para obtener solo la temperatura más reciente de un dispositivo específico basado en el ID del usuario
 router.get('/ver-temperatura/:userId', (req, res) => {
     const { userId: ID_Usuario } = req.params;
 
