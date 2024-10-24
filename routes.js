@@ -11,7 +11,7 @@ router.get('/', (req, res) => {
 // Estructura en memoria para almacenar las imágenes temporalmente
 const imageStore = {};
 const MAX_IMAGES = 20; // Limitar el número de imágenes almacenadas en memoria
-const IMAGE_EXPIRATION_TIME = 5 * 60 * 1000; // 5 minutos en milisegundos
+const IMAGE_EXPIRATION_TIME = 60 * 1000; // 5 minutos en milisegundos
 
 // Ruta para recibir la imagen en formato base64, la MAC address y el ID del dispositivo
 router.post('/video', (req, res) => {
